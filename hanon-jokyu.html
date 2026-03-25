@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>復習サイクル管理</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@300;400;500&display=swap');
+:root {
+  --bg: #f5f2eb; --surface: #faf8f4; --surface2: #edeae2;
+  --border: #d8d3c8; --border2: #c8c3b8;
+  --ink: #1a1814; --ink2: #5a5650; --ink3: #8a8680;
+  --accent: #2a5c3f; --accent-light: #d4e8da;
+  --amber: #8a5c1a; --amber-light: #f0e4cc;
+  --red: #8a1a1a; --red-light: #f0d4d4;
+  --blue: #1a3a5c; --blue-light: #d4e0f0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: 'Noto Sans JP', sans-serif; font-weight: 300; min-height: 100vh; }
+body::after { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; opacity: 0.6; }
+.app { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+/* HEADER */
+header { margin-bottom: 32px; }
+.header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -0.5px; line-height: 1; }
+.logo-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink3); letter-spacing: 0.2em; margin-top: 5px; text-transform: uppercase; }
+.stat-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.chip { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; text-align: center; }
+.chip-num { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; line-height: 1; display: block; }
+.chip-num.green { color: var(--accent); } .chip-num.amber { color: var(--amber); }
+.chip-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink3); letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-top: 2px; }
+.limit-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; }
+.limit-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink2); white-space: nowrap; }
+.limit-track { flex: 1; background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+.limit-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.4s ease; }
+.limit-fill.amber { background: var(--amber); } .limit-fill.red { background: var(--red); }
+.limit-count { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; white-space: nowrap; min-width: 40px; text-align: right; }
+.limit-control { display: flex; align-items: center; gap: 6px; }
+.limit-btn { width: 26px; height: 26px; border: 1px solid var(--border2); background: var(--bg); border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; color: var(--ink2); transition: all 0.15s; font-family: 'Syne', sans-serif; }
+.limit-btn:hover { background: var(--surface2); border-color: var(--accent); color: var(--accent); }
+.limit-val { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; min-width: 24px; text-align: center; }
+
+/* BOOK TABS */
+.book-tabs-wrap { display: flex; align-items: center; border-bottom: 2px solid var(--border); margin-bottom: 0; gap: 0; overflow-x: auto; }
+.book-tab { padding: 10px 18px; background: none; border: none; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
+.book-tab:hover { color: var(--ink2); }
+.book-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.book-tab-add { padding: 10px 14px; background: none; border: none; font-size: 18px; color: var(--ink3); cursor: pointer; margin-bottom: -2px; transition: color 0.15s; flex-shrink: 0; }
+.book-tab-add:hover { color: var(--accent); }
+
+/* SUB TABS */
+.sub-tabs { display: flex; gap: 2px; margin: 16px 0 20px; background: var(--surface); padding: 4px; border-radius: 8px; border: 1px solid var(--border); }
+.sub-tab { flex: 1; padding: 7px 0; background: none; border: none; color: var(--ink3); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; cursor: pointer; border-radius: 5px; transition: all 0.2s; }
+.sub-tab:hover { color: var(--ink2); }
+.sub-tab.active { background: var(--surface2); color: var(--accent); border: 1px solid var(--border); }
+
+/* PANELS */
+.panel { display: none; }
+.panel.active { display: block; animation: fadeUp 0.2s ease; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* QUEUE CARDS */
+.section-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.section-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: var(--ink3); text-transform: uppercase; }
+.section-count { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--ink2); }
+.queue-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 8px; display: flex; align-items: center; gap: 16px; transition: border-color 0.15s, box-shadow 0.15s; }
+.queue-card:hover { border-color: var(--border2); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.queue-card.carryover { border-left: 3px solid var(--amber); background: #fdfaf4; }
+.queue-card.new-lesson { border-left: 3px solid var(--blue); background: #f4f7fd; }
+.queue-card.done-today { opacity: 0.45; background: var(--surface2); border-color: var(--border); }
+.card-num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 11px; color: var(--ink3); min-width: 20px; text-align: center; }
+.card-body { flex: 1; min-width: 0; }
+.card-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink3); margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
+.badge { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 9px; letter-spacing: 0.12em; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
+.badge-carry { background: var(--amber-light); color: var(--amber); border: 1px solid #d4a86a; }
+.badge-new   { background: var(--blue-light);  color: var(--blue);  border: 1px solid #8aaad0; }
+.badge-due   { background: var(--accent-light); color: var(--accent);border: 1px solid #8abba0; }
+.card-title { font-size: 15px; font-weight: 400; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink3); margin-top: 4px; }
+.card-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-done { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px 20px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-done:hover { background: #1e4a30; transform: translateY(-1px); }
+.btn-skip { background: transparent; border: 1px solid var(--border2); border-radius: 6px; padding: 8px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink3); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-skip:hover { border-color: var(--amber); color: var(--amber); }
+.btn-undo { width: 34px; height: 34px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border2); color: var(--ink3); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+.btn-undo:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-light); }
+
+/* PENDING */
+.pending-section { margin-top: 28px; padding: 16px; background: var(--amber-light); border: 1px solid #d4a86a; border-radius: 10px; }
+.pending-header { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; color: var(--amber); text-transform: uppercase; margin-bottom: 10px; }
+.pending-item { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--amber); padding: 3px 0; }
+.empty { text-align: center; padding: 60px 0; color: var(--ink3); }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-msg { font-size: 15px; margin-bottom: 6px; color: var(--ink2); }
+.empty-sub { font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+
+/* SCHEDULE TABLE */
+.schedule-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink3); text-align: left; padding: 6px 12px 10px; border-bottom: 1px solid var(--border); }
+tbody tr { border-bottom: 1px solid var(--surface2); transition: background 0.1s; }
+tbody tr:hover { background: var(--surface); }
+tbody td { padding: 10px 12px; color: var(--ink2); }
+tbody td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); }
+.date-cell { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.date-today { color: var(--accent); font-weight: 500; }
+.date-past  { color: var(--red); }
+.date-soon  { color: var(--amber); }
+.dots { display: flex; gap: 3px; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: 0.8; }
+.dot.empty-dot { background: var(--border); }
+
+/* ADD BOOK MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.hidden { display: none; }
+.modal { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 32px; max-width: 520px; width: 100%; }
+.modal-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; margin-bottom: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; color: var(--ink3); text-transform: uppercase; }
+input[type=text] { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--ink); font-family: 'Noto Sans JP', sans-serif; font-size: 14px; padding: 10px 14px; outline: none; transition: border-color 0.15s; }
+input[type=text]:focus { border-color: var(--accent); }
+.file-drop { border: 2px dashed var(--border2); border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.15s; color: var(--ink3); font-size: 13px; }
+.file-drop:hover, .file-drop.drag-over { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.file-drop input[type=file] { display: none; }
+.file-name { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); margin-top: 8px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 10px 24px; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; }
+.btn-primary:hover { background: #1e4a30; }
+.btn-primary:disabled { background: var(--border); color: var(--ink3); cursor: default; }
+.btn-cancel { background: transparent; border: 1px solid var(--border2); border-radius: 6px; padding: 10px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink3); cursor: pointer; transition: all 0.15s; }
+.btn-cancel:hover { border-color: var(--red); color: var(--red); }
+
+/* DELETE BOOK */
+.book-tab-del { font-size: 11px; color: var(--ink3); cursor: pointer; margin-left: 4px; opacity: 0.5; }
+.book-tab-del:hover { color: var(--red); opacity: 1; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px); background: var(--ink); color: #fff; border-radius: 8px; padding: 10px 22px; font-family: 'JetBrains Mono', monospace; font-size: 12px; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 999; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 600px) {
+  .header-top { flex-direction: column; gap: 12px; }
+  .stat-chips { justify-content: flex-start; }
+  .queue-card { flex-wrap: wrap; }
+  .card-right { width: 100%; justify-content: flex-end; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="header-top">
+      <div>
+        <div class="logo">復習サイクル<span style="color:var(--accent)">管理</span></div>
+        <div class="logo-sub">Spaced Repetition · 固定間隔スケジュール &nbsp;<span id="syncStatus" style="font-size:10px;letter-spacing:0.05em;transition:color 0.3s"></span></div>
+      </div>
+      <div class="stat-chips" id="statChips"></div>
+    </div>
+    <div class="limit-bar">
+      <span class="limit-label">1日の上限（全体）</span>
+      <div class="limit-track"><div class="limit-fill" id="limitFill"></div></div>
+      <span class="limit-count" id="limitCount"></span>
+      <div class="limit-control">
+        <button class="limit-btn" onclick="changeLimit(-1)">−</button>
+        <span class="limit-val" id="limitVal"></span>
+        <button class="limit-btn" onclick="changeLimit(+1)">+</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 本タブ -->
+  <div class="book-tabs-wrap" id="bookTabs"></div>
+
+  <!-- 各本のコンテンツ（動的生成） -->
+  <div id="bookContents"></div>
+</div>
+
+<!-- 本追加モーダル -->
+<div class="modal-overlay hidden" id="addBookModal">
+  <div class="modal">
+    <div class="modal-title">本を追加</div>
+    <div class="form-group">
+      <label>本の名前</label>
+      <input type="text" id="newBookName" placeholder="例: ハノン初級">
+    </div>
+    <div class="form-group">
+      <label>CSVファイル（上級と同じ形式）</label>
+      <div class="file-drop" id="fileDrop" onclick="document.getElementById('csvFileInput').click()">
+        <div>📄 クリックしてCSVを選択</div>
+        <div style="font-size:11px;margin-top:6px;font-family:JetBrains Mono,monospace">または drag & drop</div>
+        <input type="file" id="csvFileInput" accept=".csv">
+      </div>
+      <div class="file-name" id="fileName"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-primary" id="addBookBtn" onclick="addBook()" disabled>追加する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const INTERVALS = [1, 7, 16, 35, 60, 90, 120, 150, 180, 365];
+const GAS_URL = 'https://script.google.com/macros/s/AKfycby_dG8xssxGydNTWWewoUPWbNPiXPFpbFuXouvErzCwV4uuO0o0VkSNa-IQrqoI72P2Iw/exec';
+const SKEY = 'hanon_multi_v1';
+const LIMIT_KEY = 'hanon_jokyu_limit';
+
+// ─── SEED（上級データ）───────────────────────────────────────
+const JOKYU_SEED = [{"id":"1.1.1","reps":6,"lastReview":"2026/02/01","nextDate":"2026/05/02","allDates":["2025/10/03","2025/10/04","2025/10/11","2025/10/27","2025/12/01","2026/02/01"]},{"id":"1.1.2","reps":6,"lastReview":"2026/02/02","nextDate":"2026/05/03","allDates":["2025/10/04","2025/10/05","2025/10/12","2025/10/28","2025/12/02","2026/02/02"]},{"id":"1.2.1","reps":6,"lastReview":"2026/02/03","nextDate":"2026/05/04","allDates":["2025/10/05","2025/10/06","2025/10/13","2025/10/29","2025/12/03","2026/02/03"]},{"id":"1.2.2","reps":6,"lastReview":"2026/02/04","nextDate":"2026/05/05","allDates":["2025/10/06","2025/10/07","2025/10/14","2025/10/30","2025/12/04","2026/02/04"]},{"id":"2.1.1","reps":6,"lastReview":"2026/02/10","nextDate":"2026/05/11","allDates":["2025/10/07","2025/10/08","2025/10/15","2025/11/05","2025/12/10","2026/02/10"]},{"id":"2.1.2","reps":6,"lastReview":"2026/02/18","nextDate":"2026/05/19","allDates":["2025/10/08","2025/10/09","2025/10/16","2025/11/06","2025/12/18","2026/02/18"]},{"id":"2.2.1","reps":6,"lastReview":"2026/02/19","nextDate":"2026/05/20","allDates":["2025/10/11","2025/10/12","2025/10/19","2025/11/07","2025/12/19","2026/02/19"]},{"id":"2.2.2","reps":6,"lastReview":"2026/02/20","nextDate":"2026/05/21","allDates":["2025/10/12","2025/10/13","2025/10/20","2025/11/08","2025/12/20","2026/02/20"]},{"id":"2.3.1","reps":5,"lastReview":"2025/12/21","nextDate":"2026/02/19","allDates":["2025/10/13","2025/10/14","2025/10/21","2025/11/09","2025/12/21"]},{"id":"2.3.2","reps":5,"lastReview":"2025/12/22","nextDate":"2026/02/20","allDates":["2025/10/14","2025/10/15","2025/10/22","2025/11/10","2025/12/22"]},{"id":"3.1","reps":5,"lastReview":"2025/12/23","nextDate":"2026/02/21","allDates":["2025/10/15","2025/10/16","2025/10/23","2025/11/11","2025/12/23"]},{"id":"3.2","reps":5,"lastReview":"2025/12/24","nextDate":"2026/02/22","allDates":["2025/10/18","2025/10/19","2025/10/26","2025/11/12","2025/12/24"]},{"id":"3.3","reps":5,"lastReview":"2025/12/25","nextDate":"2026/02/23","allDates":["2025/10/19","2025/10/20","2025/10/27","2025/11/13","2025/12/25"]},{"id":"3.4","reps":5,"lastReview":"2025/12/27","nextDate":"2026/02/25","allDates":["2025/10/22","2025/10/23","2025/10/30","2025/11/15","2025/12/27"]},{"id":"3.5","reps":5,"lastReview":"2026/01/02","nextDate":"2026/03/03","allDates":["2025/10/23","2025/10/24","2025/11/05","2025/11/21","2026/01/02"]},{"id":"4.1","reps":5,"lastReview":"2026/01/03","nextDate":"2026/03/04","allDates":["2025/10/24","2025/10/25","2025/11/06","2025/11/22","2026/01/03"]},{"id":"4.2","reps":5,"lastReview":"2026/01/04","nextDate":"2026/03/05","allDates":["2025/10/25","2025/10/26","2025/11/07","2025/11/23","2026/01/04"]},{"id":"4.3","reps":5,"lastReview":"2026/01/05","nextDate":"2026/03/06","allDates":["2025/10/26","2025/10/27","2025/11/08","2025/11/24","2026/01/05"]},{"id":"4.4","reps":5,"lastReview":"2026/01/06","nextDate":"2026/03/07","allDates":["2025/10/27","2025/10/28","2025/11/09","2025/11/25","2026/01/06"]},{"id":"5.1","reps":5,"lastReview":"2026/01/07","nextDate":"2026/03/08","allDates":["2025/10/28","2025/10/29","2025/11/10","2025/11/26","2026/01/07"]},{"id":"5.2","reps":5,"lastReview":"2026/01/09","nextDate":"2026/03/10","allDates":["2025/10/30","2025/11/05","2025/11/12","2025/11/28","2026/01/09"]},{"id":"5.3","reps":5,"lastReview":"2026/01/14","nextDate":"2026/03/15","allDates":["2025/11/09","2025/11/10","2025/11/17","2025/12/03","2026/01/14"]},{"id":"5.4","reps":5,"lastReview":"2026/01/21","nextDate":"2026/03/22","allDates":["2025/11/16","2025/11/17","2025/11/24","2025/12/10","2026/01/21"]},{"id":"5.5","reps":5,"lastReview":"2026/01/29","nextDate":"2026/03/30","allDates":["2025/11/18","2025/11/19","2025/11/26","2025/12/18","2026/01/29"]},{"id":"5.6","reps":4,"lastReview":"2025/12/21","nextDate":"2026/01/25","allDates":["2025/11/20","2025/11/21","2025/11/28","2025/12/21"]},{"id":"6.1","reps":4,"lastReview":"2025/12/23","nextDate":"2026/01/27","allDates":["2025/11/22","2025/11/23","2025/11/30","2025/12/23"]},{"id":"6.2","reps":4,"lastReview":"2025/12/26","nextDate":"2026/01/30","allDates":["2025/11/25","2025/11/26","2025/12/03","2025/12/26"]},{"id":"6.3","reps":4,"lastReview":"2025/12/28","nextDate":"2026/02/01","allDates":["2025/11/27","2025/11/28","2025/12/05","2025/12/28"]},{"id":"6.4","reps":4,"lastReview":"2025/12/30","nextDate":"2026/02/03","allDates":["2025/11/29","2025/11/30","2025/12/07","2025/12/30"]},{"id":"6.5","reps":4,"lastReview":"2026/01/01","nextDate":"2026/02/05","allDates":["2025/12/01","2025/12/02","2025/12/09","2026/01/01"]},{"id":"7.1.1","reps":4,"lastReview":"2026/01/03","nextDate":"2026/02/07","allDates":["2025/12/04","2025/12/05","2025/12/18","2026/01/03"]},{"id":"7.1.2","reps":4,"lastReview":"2026/01/18","nextDate":"2026/02/22","allDates":["2025/12/20","2025/12/21","2026/01/02","2026/01/18"]},{"id":"7.1.3","reps":4,"lastReview":"2026/01/25","nextDate":"2026/03/01","allDates":["2025/12/22","2026/01/02","2026/01/09","2026/01/25"]},{"id":"7.1.4","reps":4,"lastReview":"2026/01/28","nextDate":"2026/03/04","allDates":["2026/01/04","2026/01/05","2026/01/12","2026/01/28"]},{"id":"7.1.5","reps":4,"lastReview":"2026/01/31","nextDate":"2026/03/07","allDates":["2026/01/07","2026/01/08","2026/01/15","2026/01/31"]},{"id":"7.1.6","reps":4,"lastReview":"2026/02/01","nextDate":"2026/03/08","allDates":["2026/01/08","2026/01/09","2026/01/16","2026/02/01"]},{"id":"7.1.7","reps":4,"lastReview":"2026/02/03","nextDate":"2026/03/10","allDates":["2026/01/10","2026/01/11","2026/01/18","2026/02/03"]},{"id":"7.1.8","reps":4,"lastReview":"2026/02/04","nextDate":"2026/03/11","allDates":["2026/01/11","2026/01/12","2026/01/19","2026/02/04"]},{"id":"7.1.9","reps":4,"lastReview":"2026/02/06","nextDate":"2026/03/13","allDates":["2026/01/13","2026/01/14","2026/01/21","2026/02/06"]},{"id":"7.2.1","reps":4,"lastReview":"2026/02/09","nextDate":"2026/03/16","allDates":["2026/01/16","2026/01/17","2026/01/24","2026/02/09"]},{"id":"8.1.1.1","reps":4,"lastReview":"2026/02/11","nextDate":"2026/03/18","allDates":["2026/01/18","2026/01/19","2026/01/26","2026/02/11"]},{"id":"8.1.1.2","reps":4,"lastReview":"2026/02/13","nextDate":"2026/03/20","allDates":["2026/01/20","2026/01/21","2026/01/28","2026/02/13"]},{"id":"8.1.1.3","reps":4,"lastReview":"2026/02/15","nextDate":"2026/03/22","allDates":["2026/01/22","2026/01/23","2026/01/30","2026/02/15"]},{"id":"8.1.2.1","reps":4,"lastReview":"2026/02/18","nextDate":"2026/03/25","allDates":["2026/01/25","2026/01/26","2026/02/02","2026/02/18"]},{"id":"8.1.2.2","reps":4,"lastReview":"2026/02/20","nextDate":"2026/03/27","allDates":["2026/01/27","2026/01/28","2026/02/04","2026/02/20"]},{"id":"8.1.2.3","reps":3,"lastReview":"2026/02/16","nextDate":"2026/03/04","allDates":["2026/02/08","2026/02/09","2026/02/16"]},{"id":"8.1.3.1","reps":3,"lastReview":"2026/02/19","nextDate":"2026/03/07","allDates":["2026/02/11","2026/02/12","2026/02/19"]},{"id":"8.1.3.2","reps":2,"lastReview":"2026/02/14","nextDate":"2026/02/21","allDates":["2026/02/13","2026/02/14"]},{"id":"8.1.3.3","reps":2,"lastReview":"2026/02/16","nextDate":"2026/02/23","allDates":["2026/02/15","2026/02/16"]},{"id":"8.2.1.1","reps":2,"lastReview":"2026/02/18","nextDate":"2026/02/25","allDates":["2026/02/17","2026/02/18"]},{"id":"8.2.2.1","reps":2,"lastReview":"2026/02/19","nextDate":"2026/02/26","allDates":["2026/02/18","2026/02/19"]},{"id":"8.2.2.2","reps":1,"lastReview":"2026/02/21","nextDate":"2026/02/22","allDates":["2026/02/21"]},{"id":"8.2.2.3","reps":1,"lastReview":"2026/02/22","nextDate":"2026/02/23","allDates":["2026/02/22"]},{"id":"8.2.3","reps":1,"lastReview":"2026/02/23","nextDate":"2026/02/24","allDates":["2026/02/23"]},{"id":"8.3.1.1","reps":1,"lastReview":"2026/02/24","nextDate":"2026/02/25","allDates":["2026/02/24"]},{"id":"8.3.1.2","reps":1,"lastReview":"2026/02/25","nextDate":"2026/02/26","allDates":["2026/02/25"]},{"id":"8.3.2.1","reps":1,"lastReview":"2026/02/26","nextDate":"2026/02/27","allDates":["2026/02/26"]},{"id":"8.3.2.2","reps":1,"lastReview":"2026/02/27","nextDate":"2026/02/28","allDates":["2026/02/27"]},{"id":"9.1.1","reps":1,"lastReview":"2026/02/28","nextDate":"2026/03/01","allDates":["2026/02/28"]},{"id":"9.1.2","reps":1,"lastReview":"2026/03/01","nextDate":"2026/03/02","allDates":["2026/03/01"]},{"id":"9.2.1","reps":1,"lastReview":"2026/03/02","nextDate":"2026/03/03","allDates":["2026/03/02"]},{"id":"9.2.2","reps":1,"lastReview":"2026/03/03","nextDate":"2026/03/04","allDates":["2026/03/03"]},{"id":"10.1.1.1","reps":1,"lastReview":"2026/03/04","nextDate":"2026/03/05","allDates":["2026/03/04"]},{"id":"10.1.1.2","reps":1,"lastReview":"2026/03/05","nextDate":"2026/03/06","allDates":["2026/03/05"]},{"id":"10.1.1.3","reps":1,"lastReview":"2026/03/06","nextDate":"2026/03/07","allDates":["2026/03/06"]},{"id":"10.1.1.4","reps":1,"lastReview":"2026/03/07","nextDate":"2026/03/08","allDates":["2026/03/07"]},{"id":"10.1.2.1","reps":1,"lastReview":"2026/03/08","nextDate":"2026/03/09","allDates":["2026/03/08"]},{"id":"10.1.2.2","reps":1,"lastReview":"2026/03/09","nextDate":"2026/03/10","allDates":["2026/03/09"]},{"id":"10.1.2.3","reps":1,"lastReview":"2026/03/10","nextDate":"2026/03/11","allDates":["2026/03/10"]},{"id":"11.1","reps":1,"lastReview":"2026/03/11","nextDate":"2026/03/12","allDates":["2026/03/11"]},{"id":"11.2","reps":1,"lastReview":"2026/03/12","nextDate":"2026/03/13","allDates":["2026/03/12"]},{"id":"11.3","reps":1,"lastReview":"2026/03/13","nextDate":"2026/03/14","allDates":["2026/03/13"]},{"id":"11.4","reps":1,"lastReview":"2026/03/14","nextDate":"2026/03/15","allDates":["2026/03/14"]},{"id":"11.5","reps":1,"lastReview":"2026/03/15","nextDate":"2026/03/16","allDates":["2026/03/15"]},{"id":"12.1.1","reps":1,"lastReview":"2026/03/16","nextDate":"2026/03/17","allDates":["2026/03/16"]},{"id":"12.1.2","reps":1,"lastReview":"2026/03/17","nextDate":"2026/03/18","allDates":["2026/03/17"]},{"id":"12.2.1","reps":1,"lastReview":"2026/03/18","nextDate":"2026/03/19","allDates":["2026/03/18"]},{"id":"12.2.2","reps":1,"lastReview":"2026/03/19","nextDate":"2026/03/20","allDates":["2026/03/19"]},{"id":"12.3","reps":1,"lastReview":"2026/03/20","nextDate":"2026/03/21","allDates":["2026/03/20"]},{"id":"13.1","reps":1,"lastReview":"2026/03/21","nextDate":"2026/03/22","allDates":["2026/03/21"]},{"id":"13.2","reps":1,"lastReview":"2026/03/22","nextDate":"2026/03/23","allDates":["2026/03/22"]},{"id":"13.3","reps":0,"lastReview":null,"nextDate":"2026/03/25","allDates":[]},{"id":"14.1.1","reps":0,"lastReview":null,"nextDate":"2026/03/26","allDates":[]},{"id":"14.1.2","reps":0,"lastReview":null,"nextDate":"2026/03/27","allDates":[]},{"id":"14.2","reps":0,"lastReview":null,"nextDate":"2026/03/28","allDates":[]},{"id":"14.3","reps":0,"lastReview":null,"nextDate":"2026/03/29","allDates":[]},{"id":"14.4.1.1","reps":0,"lastReview":null,"nextDate":"2026/03/30","allDates":[]},{"id":"14.4.1.2","reps":0,"lastReview":null,"nextDate":"2026/03/31","allDates":[]},{"id":"14.4.2.1","reps":0,"lastReview":null,"nextDate":"2026/04/01","allDates":[]},{"id":"14.4.2.2","reps":0,"lastReview":null,"nextDate":"2026/04/02","allDates":[]}];
+
+// ─── GAS SYNC ────────────────────────────────────────────────
+async function loadFromGAS() {
+  try {
+    setSyncStatus('syncing');
+    const res = await fetch(GAS_URL);
+    const text = await res.text();
+    const remote = JSON.parse(text);
+    if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
+      localStorage.setItem(SKEY, JSON.stringify(remote));
+      booksDB = remote;
+    }
+    setSyncStatus('ok');
+  } catch(e) {
+    console.warn('GAS load failed:', e);
+    setSyncStatus('error');
+  }
+}
+
+async function saveToGAS(data) {
+  try {
+    await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'text/plain' } });
+    setSyncStatus('ok');
+  } catch(e) {
+    console.warn('GAS save failed:', e);
+    setSyncStatus('error');
+  }
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  const map = { syncing: '⟳ 同期中…', ok: '✓ 同期済み', error: '⚠ オフライン' };
+  const col = { syncing: 'var(--amber)', ok: 'var(--accent)', error: 'var(--red)' };
+  el.textContent = map[status] || '';
+  el.style.color = col[status] || 'var(--ink3)';
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────
+// booksDB: { bookId: { name, lessons: {id: lessonObj} } }
+function loadBooksDB() {
+  try {
+    const raw = localStorage.getItem(SKEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  // 初回: 上級データをシード
+  const db = {
+    jokyu: {
+      name: '上級',
+      lessons: {}
+    }
+  };
+  JOKYU_SEED.forEach(l => { db.jokyu.lessons[l.id] = { ...l, doneToday: false, doneDate: null }; });
+  return db;
+}
+
+function saveBooksDB() {
+  localStorage.setItem(SKEY, JSON.stringify(booksDB));
+  saveToGAS(booksDB);
+}
+
+let booksDB = loadBooksDB();
+let dailyLimit = parseInt(localStorage.getItem(LIMIT_KEY) || '3');
+let currentBook = Object.keys(booksDB)[0];
+let currentSubTab = 'today'; // 'today' or 'schedule'
+
+// ─── DATE HELPERS ─────────────────────────────────────────────
+function todayStr() { return new Date().toLocaleDateString('sv-SE').replace(/-/g, '/'); }
+function addDays(dateStr, n) {
+  const d = new Date(dateStr.replace(/\//g, '-'));
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('sv-SE').replace(/-/g, '/');
+}
+function daysBetween(a, b) {
+  return Math.round((new Date(b.replace(/\//g,'-')) - new Date(a.replace(/\//g,'-'))) / 86400000);
+}
+
+// ─── CSV PARSER ───────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const TODAY = todayStr();
+  const lessons = [];
+
+  for (let i = 2; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    const lid = cols[1]?.trim();
+    if (!lid || lid === '教科名') continue;
+
+    const actual_dates = [];
+    for (let j = 2; j < Math.min(cols.length, 12); j++) {
+      const v = cols[j]?.trim().replace(/"/g, '');
+      if (v && v.match(/\d{4}\/\d{2}\/\d{2}/) && !v.includes('1899') && !v.includes('1900')) {
+        actual_dates.push(v);
+      }
+    }
+
+    const reps = actual_dates.length;
+    const lastReview = reps > 0 ? actual_dates[actual_dates.length - 1] : null;
+
+    if (reps === 0) {
+      lessons.push({ id: lid, reps: 0, lastReview: null, nextDate: null, allDates: [], doneDate: null, doneToday: false });
+      continue;
+    }
+
+    if (actual_dates[0] > TODAY) {
+      lessons.push({ id: lid, reps: 0, lastReview: null, nextDate: actual_dates[0], allDates: [], doneDate: null, doneToday: false });
+      continue;
+    }
+
+    const lastD = new Date(lastReview.replace(/\//g, '-'));
+    const nextInterval = reps - 1 < INTERVALS.length ? INTERVALS[reps - 1] : INTERVALS[INTERVALS.length - 1];
+    lastD.setDate(lastD.getDate() + nextInterval);
+    const nextDate = lastD.toLocaleDateString('sv-SE').replace(/-/g, '/');
+
+    lessons.push({ id: lid, reps, lastReview, nextDate, allDates: actual_dates, doneDate: null, doneToday: false });
+  }
+  return lessons;
+}
+
+// ─── LESSON ACTIONS ───────────────────────────────────────────
+function getLesson(bookId, id) { return booksDB[bookId]?.lessons[id]; }
+
+function completLesson(bookId, id) {
+  const today = todayStr();
+  // 全本合計の今日完了数をチェック
+  let totalDone = 0;
+  Object.values(booksDB).forEach(b => {
+    totalDone += Object.values(b.lessons).filter(l => l.doneDate === today).length;
+  });
+  if (totalDone >= dailyLimit) { showToast('今日の上限に達しています', true); return; }
+
+  const lesson = getLesson(bookId, id);
+  if (!lesson) return;
+  lesson.reps += 1;
+  lesson.lastReview = today;
+  lesson.doneDate = today;
+  lesson.doneToday = true;
+  const nextIntervalDays = INTERVALS[lesson.reps - 1] !== undefined ? INTERVALS[lesson.reps - 1] : INTERVALS[INTERVALS.length - 1];
+  lesson.nextDate = addDays(today, nextIntervalDays);
+  lesson.allDates = [...(lesson.allDates || []), today];
+  saveBooksDB();
+  renderAll();
+  showToast(`✓ ${id} — 次回 ${lesson.nextDate}（${nextIntervalDays}日後）`);
+}
+
+function undoComplete(bookId, id) {
+  const lesson = getLesson(bookId, id);
+  if (!lesson) return;
+  lesson.reps = Math.max(0, lesson.reps - 1);
+  lesson.lastReview = lesson.allDates.length > 1 ? lesson.allDates[lesson.allDates.length - 2] : null;
+  lesson.allDates = lesson.allDates.slice(0, -1);
+  if (lesson.lastReview) {
+    const ni = INTERVALS[lesson.reps - 1] !== undefined ? INTERVALS[lesson.reps - 1] : INTERVALS[INTERVALS.length - 1];
+    lesson.nextDate = addDays(lesson.lastReview, ni);
+  } else {
+    lesson.nextDate = todayStr();
+  }
+  lesson.doneDate = null;
+  lesson.doneToday = false;
+  saveBooksDB();
+  renderAll();
+  showToast(`↩ ${id} の完了を取り消し`);
+}
+
+function skipLesson(bookId, id) {
+  const lesson = getLesson(bookId, id);
+  if (!lesson) return;
+  lesson.nextDate = addDays(todayStr(), 1);
+  saveBooksDB();
+  renderAll();
+  showToast(`↷ ${id} を明日に繰越`);
+}
+
+// ─── QUEUE LOGIC ─────────────────────────────────────────────
+function buildQueue(bookId) {
+  const today = todayStr();
+  const all = Object.values(booksDB[bookId].lessons);
+  const doneTodayAll = all.filter(l => l.doneDate === today);
+  const due = all.filter(l => l.nextDate <= today && l.doneDate !== today)
+    .sort((a, b) => (a.reps - b.reps) || a.nextDate.localeCompare(b.nextDate) || a.id.localeCompare(b.id));
+
+  // 全本合計の今日完了数
+  let totalDoneToday = 0;
+  Object.values(booksDB).forEach(b => {
+    totalDoneToday += Object.values(b.lessons).filter(l => l.doneDate === today).length;
+  });
+
+  const firstTimeDoneToday = doneTodayAll.filter(l => l.reps === 1);
+  const otherDoneToday = doneTodayAll.filter(l => l.reps !== 1);
+  const remainingSlots = Math.max(0, dailyLimit - totalDoneToday + doneTodayAll.length);
+  const activeQueue = due.slice(0, Math.max(0, remainingSlots - doneTodayAll.length));
+  const overflow = due.slice(Math.max(0, remainingSlots - doneTodayAll.length));
+
+  return { firstTimeDoneToday, otherDoneToday, doneToday: doneTodayAll, activeQueue, overflow,
+           allDue: all.filter(l => l.nextDate <= today) };
+}
+
+// ─── RENDER ───────────────────────────────────────────────────
+function renderAll() {
+  renderHeader();
+  renderBookTabs();
+  renderBookContent(currentBook);
+  updateLimitUI();
+}
+
+function renderHeader() {
+  const today = todayStr();
+  let totalDone = 0, totalDue = 0, totalLessons = 0, totalDoneReps = 0;
+  Object.values(booksDB).forEach(b => {
+    const all = Object.values(b.lessons);
+    totalDone += all.filter(l => l.doneDate === today).length;
+    totalDue  += all.filter(l => l.nextDate <= today).length;
+    totalLessons += all.length;
+    totalDoneReps += all.filter(l => l.reps > 0).length;
+  });
+  document.getElementById('statChips').innerHTML = `
+    <div class="chip"><span class="chip-num green">${totalDone}/${dailyLimit}</span><span class="chip-label">TODAY</span></div>
+    <div class="chip"><span class="chip-num amber">${totalDue}</span><span class="chip-label">DUE</span></div>
+    <div class="chip"><span class="chip-num">${totalDoneReps}/${totalLessons}</span><span class="chip-label">TOTAL</span></div>`;
+}
+
+function updateLimitUI() {
+  const today = todayStr();
+  let totalDone = 0;
+  Object.values(booksDB).forEach(b => {
+    totalDone += Object.values(b.lessons).filter(l => l.doneDate === today).length;
+  });
+  const pct = Math.min(100, (totalDone / dailyLimit) * 100);
+  const fill = document.getElementById('limitFill');
+  fill.style.width = pct + '%';
+  fill.className = 'limit-fill' + (pct >= 100 ? ' red' : pct >= 66 ? ' amber' : '');
+  document.getElementById('limitCount').textContent = `${totalDone} / ${dailyLimit}`;
+  document.getElementById('limitVal').textContent = dailyLimit;
+}
+
+function renderBookTabs() {
+  const wrap = document.getElementById('bookTabs');
+  const books = Object.entries(booksDB);
+  wrap.innerHTML = books.map(([bid, b]) => `
+    <button class="book-tab ${bid === currentBook ? 'active' : ''}" onclick="switchBook('${bid}')">${b.name}${books.length > 1 && bid !== 'jokyu' ? `<span class="book-tab-del" onclick="event.stopPropagation();deleteBook('${bid}')" title="削除">✕</span>` : ''}</button>
+  `).join('') + `<button class="book-tab-add" onclick="openModal()" title="本を追加">＋</button>`;
+}
+
+function renderBookContent(bookId) {
+  const container = document.getElementById('bookContents');
+  const book = booksDB[bookId];
+  if (!book) return;
+  const total = Object.values(book.lessons).length;
+
+  container.innerHTML = `
+    <div class="sub-tabs">
+      <button class="sub-tab ${currentSubTab === 'today' ? 'active' : ''}" onclick="switchSubTab('today', this)">TODAY</button>
+      <button class="sub-tab ${currentSubTab === 'schedule' ? 'active' : ''}" onclick="switchSubTab('schedule', this)">SCHEDULE</button>
+    </div>
+    <div id="subpanel-today" class="panel ${currentSubTab === 'today' ? 'active' : ''}">
+      <div id="todayContent"></div>
+    </div>
+    <div id="subpanel-schedule" class="panel ${currentSubTab === 'schedule' ? 'active' : ''}">
+      <div class="section-row"><span class="section-label">全${total}レッスン · 次回日程順</span></div>
+      <div class="schedule-wrap">
+        <table><thead><tr>
+          <th>レッスンID</th><th>次回日程</th><th>復習回数</th><th>進捗</th><th>前回</th>
+        </tr></thead><tbody id="scheduleTbody"></tbody></table>
+      </div>
+    </div>`;
+
+  renderToday(bookId);
+  renderSchedule(bookId);
+}
+
+function renderToday(bookId) {
+  const today = todayStr();
+  const { firstTimeDoneToday, otherDoneToday, doneToday, activeQueue, overflow, allDue } = buildQueue(bookId);
+  const el = document.getElementById('todayContent');
+  if (!el) return;
+
+  if (doneToday.length + activeQueue.length === 0) {
+    let msg;
+    if (allDue.length === 0) {
+      const next = Object.values(booksDB[bookId].lessons).filter(l => l.nextDate > today)
+        .sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0];
+      msg = `<div class="empty"><div class="empty-icon">🎉</div><div class="empty-msg">今日の復習はすべて完了！</div><div class="empty-sub">次回: ${next ? next.nextDate + ' — ' + next.id : 'なし'}</div></div>`;
+    } else {
+      msg = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-msg">今日の上限（${dailyLimit}件）を達成！</div><div class="empty-sub">残り ${allDue.filter(l=>l.doneDate!==today).length} 件は翌日以降に繰越</div></div>`;
+    }
+    el.innerHTML = msg;
+    if (overflow.length > 0) appendOverflow(el, overflow, bookId);
+    return;
+  }
+
+  const allShown = [...firstTimeDoneToday, ...activeQueue, ...otherDoneToday];
+  let html = `<div class="section-row"><span class="section-label">今日のキュー</span><span class="section-count">${doneToday.length} / ${allShown.length} 完了</span></div>`;
+
+  allShown.forEach((lesson, i) => {
+    const isDone = lesson.doneDate === today;
+    const isCarry = !isDone && lesson.nextDate < today;
+    const isNew = lesson.reps === 0;
+    const badge = isCarry ? `<span class="badge badge-carry">繰越</span>` : isNew ? `<span class="badge badge-new">初回</span>` : `<span class="badge badge-due">本日分</span>`;
+    const daysLate = isCarry ? daysBetween(lesson.nextDate, today) : 0;
+    const metaText = isDone ? `次回: ${lesson.nextDate} | 累計: ${lesson.reps}回` : isCarry ? `${daysLate}日遅れ | 累計: ${lesson.reps}回` : `累計: ${lesson.reps}回 | 前回: ${lesson.lastReview || '初回'}`;
+    html += `<div class="queue-card ${isDone ? 'done-today' : ''} ${isCarry ? 'carryover' : ''} ${isNew ? 'new-lesson' : ''}">
+      <span class="card-num">${String(i+1).padStart(2,'0')}</span>
+      <div class="card-body">
+        <div class="card-id">${booksDB[bookId].name} ${lesson.id} ${badge}</div>
+        <div class="card-title">レッスン ${lesson.id}</div>
+        <div class="card-meta">${metaText}</div>
+      </div>
+      <div class="card-right">
+        ${isDone
+          ? `<button class="btn-undo" onclick="undoComplete('${bookId}','${lesson.id}')" title="完了を取り消す">↩</button>`
+          : `<button class="btn-skip" onclick="skipLesson('${bookId}','${lesson.id}')">明日へ</button>
+             <button class="btn-done" onclick="completLesson('${bookId}','${lesson.id}')">完了 ✓</button>`}
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+  if (overflow.length > 0) appendOverflow(el, overflow, bookId);
+}
+
+function appendOverflow(el, overflow, bookId) {
+  const div = document.createElement('div');
+  div.className = 'pending-section';
+  div.innerHTML = `<div class="pending-header">▸ 今日は対象外 — 翌日以降に自動繰越（${overflow.length}件）</div>
+    ${overflow.slice(0,8).map(l=>`<div class="pending-item">· ${l.id} <span style="opacity:0.6">（${l.nextDate}）</span></div>`).join('')}
+    ${overflow.length > 8 ? `<div class="pending-item" style="opacity:0.5">… 他 ${overflow.length-8} 件</div>` : ''}`;
+  el.appendChild(div);
+}
+
+function renderSchedule(bookId) {
+  const today = todayStr();
+  const sorted = Object.values(booksDB[bookId].lessons).sort((a,b) => (a.nextDate||'9999').localeCompare(b.nextDate||'9999'));
+  const tbody = document.getElementById('scheduleTbody');
+  if (!tbody) return;
+  tbody.innerHTML = sorted.map(l => {
+    const isToday = l.nextDate === today;
+    const isPast  = l.nextDate < today;
+    const isSoon  = !isToday && !isPast && l.nextDate && daysBetween(today, l.nextDate) <= 7;
+    const dateClass = isPast ? 'date-past' : isToday ? 'date-today' : isSoon ? 'date-soon' : '';
+    const dots = Array.from({length:10},(_,i)=>`<div class="dot ${i<l.reps?'':'empty-dot'}"></div>`).join('');
+    return `<tr><td>${l.id}</td><td class="date-cell ${dateClass}">${l.nextDate||'—'}</td><td>${l.reps} 回</td><td><div class="dots">${dots}</div></td><td class="date-cell" style="color:var(--ink3)">${l.lastReview||'—'}</td></tr>`;
+  }).join('');
+}
+
+// ─── TAB SWITCHING ────────────────────────────────────────────
+function switchBook(bookId) {
+  currentBook = bookId;
+  renderAll();
+}
+
+function switchSubTab(name, btn) {
+  currentSubTab = name;
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#bookContents .panel').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('subpanel-' + name);
+  if (target) target.classList.add('active');
+}
+
+// ─── BOOK MANAGEMENT ─────────────────────────────────────────
+function openModal() {
+  document.getElementById('addBookModal').classList.remove('hidden');
+  document.getElementById('newBookName').value = '';
+  document.getElementById('fileName').textContent = '';
+  document.getElementById('addBookBtn').disabled = true;
+  csvFileData = null;
+}
+
+function closeModal() {
+  document.getElementById('addBookModal').classList.add('hidden');
+}
+
+let csvFileData = null;
+
+document.getElementById('csvFileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    csvFileData = ev.target.result;
+    document.getElementById('addBookBtn').disabled = !document.getElementById('newBookName').value.trim();
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+document.getElementById('newBookName').addEventListener('input', function() {
+  document.getElementById('addBookBtn').disabled = !this.value.trim() || !csvFileData;
+});
+
+// Drag & drop
+const fileDrop = document.getElementById('fileDrop');
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('drag-over'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('drag-over'));
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  fileDrop.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.name.endsWith('.csv')) { showToast('CSVファイルを選択してください', true); return; }
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    csvFileData = ev.target.result;
+    document.getElementById('addBookBtn').disabled = !document.getElementById('newBookName').value.trim();
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+function addBook() {
+  const name = document.getElementById('newBookName').value.trim();
+  if (!name || !csvFileData) return;
+  const lessons = parseCSV(csvFileData);
+  if (lessons.length === 0) { showToast('レッスンデータが見つかりませんでした', true); return; }
+  const bookId = 'book_' + Date.now();
+  booksDB[bookId] = { name, lessons: {} };
+  lessons.forEach(l => { booksDB[bookId].lessons[l.id] = l; });
+  saveBooksDB();
+  closeModal();
+  currentBook = bookId;
+  renderAll();
+  showToast(`「${name}」を追加しました（${lessons.length}件）`);
+}
+
+function deleteBook(bookId) {
+  const name = booksDB[bookId]?.name;
+  if (!confirm(`「${name}」を削除しますか？`)) return;
+  delete booksDB[bookId];
+  saveBooksDB();
+  currentBook = Object.keys(booksDB)[0];
+  renderAll();
+  showToast(`「${name}」を削除しました`);
+}
+
+// ─── LIMIT ────────────────────────────────────────────────────
+function changeLimit(delta) {
+  dailyLimit = Math.max(1, Math.min(10, dailyLimit + delta));
+  localStorage.setItem(LIMIT_KEY, dailyLimit);
+  renderAll();
+}
+
+// ─── TOAST ────────────────────────────────────────────────────
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isErr ? 'var(--red)' : 'var(--ink)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────
+(async () => {
+  renderAll(); // まずlocalStorageのデータで即表示
+  await loadFromGAS(); // GASから最新データを取得して再描画
+  renderAll();
+})();
+</script>
+</body>
+</html>
