@@ -251,9 +251,15 @@ async function loadFromGAS() {
 async function saveToGAS(data) {
   try {
     setSyncStatus('syncing');
-    const encoded = encodeURIComponent(JSON.stringify(data));
-    await jsonp(GAS_URL + '?save=' + encoded);
-    setSyncStatus('ok');
+    // no-cors POSTで送信（CORSを回避、レスポンスは読めないが書き込みは実行される）
+    fetch(GAS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify(data),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    // レスポンスが読めないので楽観的にokとする
+    setTimeout(() => setSyncStatus('ok'), 1000);
   } catch(e) {
     console.warn('GAS save failed:', e);
     setSyncStatus('error');
